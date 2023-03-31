@@ -4,13 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "devDependencies": {
-    "vite": "^4.2.0"
-  },
+  "devDependencies": {},
   "dependencies": {
     "arg": "^5.0.2",
     "get-video-duration": "^4.1.0",
