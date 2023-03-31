@@ -2,12 +2,22 @@ import fs from 'fs';
 import { fetchPlaylistItemDetails, fetchVideoDetails } from './utils.js';
 import { getVideoDurationInSeconds } from "get-video-duration";
 import { spawn } from "child_process";
+import arg from "arg";
+
+const args = arg({
+  '--dataset': String,
+  '--album': Boolean,
+  '--max-retries': Number,
+  '-d': '--dataset',
+  '-a': '--album',
+  '-r': '--max-retries',
+});
 
 const apiKey = process.env["YOUTUBE_API_KEY"];
-const maxRetries = process.env["MAX_RETRIES"] ?? 3;
+const dataset = args['--dataset'] ?? 'default';
+const albumMode = args['--album'] ?? false;
+const maxRetries = args['--max-retries'] ?? 3;
 
-const dataset = process.argv[2] ?? 'default';
-const albumMode = process.argv[3] && process.argv[3] == 'album';
 const rawUrls = fs.readFileSync(`./data/${dataset}/${albumMode ? 'playlist_' : ''}urls.txt`, 'utf-8');
 
 let videoDetails = [];
