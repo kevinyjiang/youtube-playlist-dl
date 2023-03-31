@@ -1,0 +1,20 @@
+{
+  "name": "youtube-download",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^4.2.0"
+  },
+  "dependencies": {
+    "get-video-duration": "^4.1.0",
+    "node-fetch": "^3.3.1",
+    "youtube-mp3-downloader": "^0.7.11",
+    "ytdl-core": "^4.11.2"
+  }
+}
