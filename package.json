@@ -1,5 +1,5 @@
 {
-  "name": "youtube-download",
+  "name": "youtube-playlist-dl",
   "private": true,
   "version": "0.0.0",
   "type": "module",
