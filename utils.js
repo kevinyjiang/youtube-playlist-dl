@@ -4,7 +4,7 @@ const extractVideoId = (url) => {
   const regex = /(?:v=|youtu\.be\/)([^&?]+)/;
   const match = url.match(regex);
   return match ? match[1] : null;
-}
+};
 
 const extractPlaylistId = (_url) => {
   const url = new URL(_url);
@@ -15,7 +15,7 @@ const extractPlaylistId = (_url) => {
     return;
   }
   return playlistId;
-}
+};
 
 export const fetchPlaylistName = async (playlistId, apiKey) => {
   const requestUrl = `https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${playlistId}&key=${apiKey}`;
@@ -41,7 +41,7 @@ export const fetchVideoDetails = async (url, apiKey) => {
   }
 
   const data = await apiResponse.json();
-  
+
   if (data.items.length > 0) {
     const videoName = data.items[0].snippet.title;
     const videoDuration = data.items[0].contentDetails.duration;
@@ -50,7 +50,7 @@ export const fetchVideoDetails = async (url, apiKey) => {
     console.warn(`Video details not found for videoId: ${videoId}`);
     return [];
   }
-}
+};
 
 export const fetchPlaylistItemDetails = async (url, apiKey) => {
   const playlistId = extractPlaylistId(url);
@@ -62,7 +62,6 @@ export const fetchPlaylistItemDetails = async (url, apiKey) => {
   do {
     const requestUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${playlistId}&key=${apiKey}&pageToken=${nextPageToken}`;
     const apiResponse = await fetch(requestUrl);
-
     if (!apiResponse.ok) {
       throw new Error(`Error fetching playlist data from YouTube API: ${apiResponse.status} ${apiResponse.statusText}`);
     }
@@ -81,7 +80,7 @@ export const fetchPlaylistItemDetails = async (url, apiKey) => {
         throw new Error(`Error fetching video details from YouTube API: ${videoDetailsResponse.status} ${videoDetailsResponse.statusText}`);
       }
       const videoDetailsData = await videoDetailsResponse.json();
-      
+
       if (videoDetailsData.items.length > 0) {
         const videoDuration = durationToSeconds(videoDetailsData.items[0].contentDetails.duration);
         result.push([videoId, videoName, videoDuration, playlistName]);
@@ -89,12 +88,11 @@ export const fetchPlaylistItemDetails = async (url, apiKey) => {
         console.warn(`Video details not found for videoId: ${videoId}`);
         continue;
       }
-
     }
   } while (nextPageToken);
 
   return result;
-}
+};
 
 function durationToSeconds(duration) {
   const match = duration.match(/P(\d+Y)?(\d+M)?(\d+W)?(\d+D)?T(\d+H)?(\d+M)?(\d+S)?/);
@@ -118,3 +116,4 @@ function durationToSeconds(duration) {
 
   return total;
 }
+
