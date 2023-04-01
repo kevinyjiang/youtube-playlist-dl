@@ -6,8 +6,7 @@ import { getVideoDurationInSeconds } from 'get-video-duration';
 const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3/';
 
 const extractVideoId = (url) => {
-  const regex = /(?:v=|youtu\.be\/)([^&?]+)/;
-  const match = url.match(regex);
+  const match = url.match(/(?:v=|youtu\.be\/)([^&?]+)/); // ty chatgpt
   return match ? match[1] : null;
 };
 
@@ -23,34 +22,32 @@ const extractPlaylistId = (_url) => {
 };
 
 export const fetchPlaylistName = async (playlistId, apiKey) => {
-  const requestUrl = `${YOUTUBE_API_BASE_URL}playlists?part=snippet&id=${playlistId}&key=${apiKey}`;
-  const apiResponse = await fetch(requestUrl);
+  const response = await fetch(`${YOUTUBE_API_BASE_URL}playlists?part=snippet&id=${playlistId}&key=${apiKey}`);
 
-  if (!apiResponse.ok) {
-    throw new Error(`Error fetching playlist data from YouTube API: ${apiResponse.status} ${apiResponse.statusText}`);
+  if (!response.ok) {
+    throw new Error(`Error fetching playlist data from YouTube API: ${response.status} ${response.statusText}`);
   }
 
-  const data = await apiResponse.json();
+  const data = await response.json();
   const playlistName = data.items[0].snippet.title;
-  return playlistName;
+  return playlistName.replace(/[^\w]+/g, '');
 };
 
 export const fetchVideoDetails = async (url, apiKey) => {
-  const videoId = extractVideoId(url);
-  const videoDetailsUrl = `${YOUTUBE_API_BASE_URL}videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`;
+  const id = extractVideoId(url);
+  const response = await fetch(`${YOUTUBE_API_BASE_URL}videos?part=snippet,contentDetails&id=${id}&key=${apiKey}`);
 
-  const apiResponse = await fetch(videoDetailsUrl);
-
-  if (!apiResponse.ok) {
-    throw new Error(`[INFO] Error fetching video details from YouTube API: ${apiResponse.status} ${apiResponse.statusText}`);
+  if (!response.ok) {
+    throw new Error(`[INFO] Error fetching video details from YouTube API: ${response.status} ${response.statusText}`);
   }
 
-  const data = await apiResponse.json();
+  const data = await response.json();
 
   if (data.items.length > 0) {
-    const videoName = data.items[0].snippet.title;
-    const videoDuration = data.items[0].contentDetails.duration;
-    return [[videoId, videoName, videoDuration]];
+    const name = data.items[0].snippet.title.replace(/[^\w]+/g, '');
+    const duration = durationToSeconds(data.items[0].contentDetails.duration);
+
+    return [[id, name, duration]];
   } else {
     console.warn(`Video details not found for videoId: ${videoId}`);
     return [];
@@ -65,30 +62,30 @@ export const fetchPlaylistItemDetails = async (url, apiKey) => {
   const playlistName = await fetchPlaylistName(playlistId, apiKey);
 
   do {
-    const requestUrl = `${YOUTUBE_API_BASE_URL}playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${playlistId}&key=${apiKey}&pageToken=${nextPageToken}`;
-    const apiResponse = await fetch(requestUrl);
-    if (!apiResponse.ok) {
-      throw new Error(`Error fetching playlist data from YouTube API: ${apiResponse.status} ${apiResponse.statusText}`);
+    const playlistResponse = await fetch(`${YOUTUBE_API_BASE_URL}playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${playlistId}&key=${apiKey}&pageToken=${nextPageToken}`);
+    
+    if (!playlistResponse.ok) {
+      throw new Error(`Error fetching playlist data from YouTube API: ${playlistResponse.status} ${playlistResponse.statusText}`);
     }
+  
+    const playlistItems = await playlistResponse.json();
+    nextPageToken = playlistItems.nextPageToken;
 
-    const data = await apiResponse.json();
-    nextPageToken = data.nextPageToken;
+    for (const item of playlistItems.items) {
+      const id = item.contentDetails.videoId;
+      const name = item.snippet.title.replace(/[^\w]+/g, '');
+      const videoResponse = await fetch(`${YOUTUBE_API_BASE_URL}videos?part=contentDetails&id=${id}&key=${apiKey}`);
 
-    for (const item of data.items) {
-      const videoId = item.contentDetails.videoId;
-      const videoName = item.snippet.title;
-      const videoDetailsUrl = `${YOUTUBE_API_BASE_URL}videos?part=contentDetails&id=${videoId}&key=${apiKey}`;
-      const videoDetailsResponse = await fetch(videoDetailsUrl);
-
-      if (!videoDetailsResponse.ok) {
-        throw new Error(`Error fetching video details from YouTube API: ${videoDetailsResponse.status} ${videoDetailsResponse.statusText}`);
+      if (!videoResponse.ok) {
+        throw new Error(`Error fetching video details from YouTube API: ${videoResponse.status} ${videoResponse.statusText}`);
       }
-      const videoDetailsData = await videoDetailsResponse.json();
-      if (videoDetailsData.items.length > 0) {
-        const videoDuration = durationToSeconds(videoDetailsData.items[0].contentDetails.duration);
-        result.push([videoId, videoName, videoDuration, playlistName]);
+
+      const details = await videoResponse.json();
+      if (details.items.length > 0) {
+        const duration = durationToSeconds(details.items[0].contentDetails.duration);
+        result.push([id, name, duration, playlistName]);
       } else {
-        console.warn(`Video details not found for videoId: ${videoId}`);
+        console.warn(`Video details not found for videoId: ${id}`);
         continue;
       }
     }
@@ -133,7 +130,6 @@ export const downloadChildProcess = async (id, name, duration, outputPath, fn, m
         await new Promise((childResolve, childReject) => {
           child.on('close', async (code) => {
             if (code === 0) {
-              console.log(`Process for ${name} (${id}) exited with success.\n`);
               if (verifyFile(outputPath, fn, duration)) {
                 childResolve();
               } else {

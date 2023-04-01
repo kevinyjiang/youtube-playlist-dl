@@ -34,23 +34,19 @@ for (const url of rawUrls) {
 
 const promises = [];
 for (let [id, name, duration, playlistName] of videoDetails) {
-  name = name.replace(/[^\w]+/g, '');
-  playlistName = playlistName.replace(/[^\w]+/g, '') ?? 'singles';
-
   const fn = name + '_' + id + '.mp3';
-  const outputPath = './data/' + dataset + '/audio/' + playlistName + '/';
+  const outputPath = './data/' + dataset + '/audio/' + (playlistName ?? 'singles') + '/';
 
   if (!fs.existsSync(outputPath)) {
     fs.mkdirSync(outputPath, { recursive: true });
   } else if (fs.existsSync(outputPath + fn)) {
-    // If the file exists, skip the download if the duration is correct.
+    // If the file exists and the duration is correct, skip the download.
     const existingFileDuration = await getVideoDurationInSeconds(outputPath + fn);
-
     if (Math.abs(existingFileDuration - duration) <= 2) {
-      console.log(`Skipping: File ${fn} exists and has the correct duration.\n`);
+      console.log(`[Skipping]: File ${fn} exists and has the correct duration.\n`);
       continue;
     } else {
-      console.log(`Redownloading: File ${fn} has an incorrect duration.\n`);
+      console.log(`[Redownloading]: File ${fn} has an incorrect duration. ${duration}\n`);
     }
   }
   promises.push(downloadChildProcess(id, name, duration, outputPath, fn, maxRetries));
