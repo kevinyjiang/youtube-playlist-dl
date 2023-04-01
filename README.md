@@ -1,2 +1,2 @@
 # youtube-playlist-dl
-wrapper for youtube-mp3-downloader to bulk download playlists
+wrapper for node-ytdl-core to bulk download playlists
