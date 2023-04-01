@@ -5,18 +5,17 @@ import { getVideoDurationInSeconds } from 'get-video-duration';
 
 const args = arg({
   '--dataset': String,
-  '--album': Boolean,
+  '--single': Boolean,
   '--max-retries': Number,
   '-d': '--dataset',
-  '-p': '--playlist',
+  '-s': '--single',
   '-r': '--max-retries',
 });
 
 const apiKey = process.env['YOUTUBE_API_KEY'];
 const dataset = args['--dataset'] ?? 'default';
-const playlistMode = args['--playlist'] ?? true;
+const playlistMode = !args['--single'] ?? true;
 const maxRetries = args['--max-retries'] ?? 3;
-
 const rawUrls = fs.readFileSync(`./data/${dataset}/${playlistMode ? 'playlist_' : 'video_'}urls.txt`, 'utf-8').split('\n');
 
 console.log(`Fetching metadata for ${rawUrls.length} ${playlistMode ? 'playlists' : 'videos'}...\n`);
