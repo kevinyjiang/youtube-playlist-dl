@@ -1,4 +1,9 @@
-import fetch from "node-fetch";
+import fs from 'fs';
+import fetch from 'node-fetch';
+import { spawn } from 'child_process';
+import { getVideoDurationInSeconds } from 'get-video-duration';
+
+const YOUTUBE_API_BASE_URL = 'https://www.googleapis.com/youtube/v3/';
 
 const extractVideoId = (url) => {
   const regex = /(?:v=|youtu\.be\/)([^&?]+)/;
@@ -9,16 +14,16 @@ const extractVideoId = (url) => {
 const extractPlaylistId = (_url) => {
   const url = new URL(_url);
   const params = new URLSearchParams(url.search);
-  const playlistId = params.get("list");
+  const playlistId = params.get('list');
   if (!playlistId) {
-    console.error("Invalid playlist URL.");
+    console.error('Invalid playlist URL.');
     return;
   }
   return playlistId;
 };
 
 export const fetchPlaylistName = async (playlistId, apiKey) => {
-  const requestUrl = `https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${playlistId}&key=${apiKey}`;
+  const requestUrl = `${YOUTUBE_API_BASE_URL}playlists?part=snippet&id=${playlistId}&key=${apiKey}`;
   const apiResponse = await fetch(requestUrl);
 
   if (!apiResponse.ok) {
@@ -32,12 +37,12 @@ export const fetchPlaylistName = async (playlistId, apiKey) => {
 
 export const fetchVideoDetails = async (url, apiKey) => {
   const videoId = extractVideoId(url);
-  const videoDetailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`;
+  const videoDetailsUrl = `${YOUTUBE_API_BASE_URL}videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`;
 
   const apiResponse = await fetch(videoDetailsUrl);
 
   if (!apiResponse.ok) {
-    throw new Error(`Error fetching video details from YouTube API: ${apiResponse.status} ${apiResponse.statusText}`);
+    throw new Error(`[INFO] Error fetching video details from YouTube API: ${apiResponse.status} ${apiResponse.statusText}`);
   }
 
   const data = await apiResponse.json();
@@ -55,12 +60,12 @@ export const fetchVideoDetails = async (url, apiKey) => {
 export const fetchPlaylistItemDetails = async (url, apiKey) => {
   const playlistId = extractPlaylistId(url);
   const result = [];
-  let nextPageToken = "";
+  let nextPageToken = '';
 
   const playlistName = await fetchPlaylistName(playlistId, apiKey);
 
   do {
-    const requestUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${playlistId}&key=${apiKey}&pageToken=${nextPageToken}`;
+    const requestUrl = `${YOUTUBE_API_BASE_URL}playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${playlistId}&key=${apiKey}&pageToken=${nextPageToken}`;
     const apiResponse = await fetch(requestUrl);
     if (!apiResponse.ok) {
       throw new Error(`Error fetching playlist data from YouTube API: ${apiResponse.status} ${apiResponse.statusText}`);
@@ -72,15 +77,13 @@ export const fetchPlaylistItemDetails = async (url, apiKey) => {
     for (const item of data.items) {
       const videoId = item.contentDetails.videoId;
       const videoName = item.snippet.title;
-      // Fetch video duration
-      const videoDetailsUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoId}&key=${apiKey}`;
+      const videoDetailsUrl = `${YOUTUBE_API_BASE_URL}videos?part=contentDetails&id=${videoId}&key=${apiKey}`;
       const videoDetailsResponse = await fetch(videoDetailsUrl);
 
       if (!videoDetailsResponse.ok) {
         throw new Error(`Error fetching video details from YouTube API: ${videoDetailsResponse.status} ${videoDetailsResponse.statusText}`);
       }
       const videoDetailsData = await videoDetailsResponse.json();
-
       if (videoDetailsData.items.length > 0) {
         const videoDuration = durationToSeconds(videoDetailsData.items[0].contentDetails.duration);
         result.push([videoId, videoName, videoDuration, playlistName]);
@@ -94,7 +97,73 @@ export const fetchPlaylistItemDetails = async (url, apiKey) => {
   return result;
 };
 
-function durationToSeconds(duration) {
+const verifyFile = async (outputPath, fn, duration) => {
+  if (fs.existsSync(outputPath + fn)) {
+    try {
+      const fileDuration = await getVideoDurationInSeconds(outputPath + fn);
+      if (Math.abs(fileDuration - duration) <= 2) {
+        console.log(`Downloaded file ${fn} of length ${fileDuration} matches expected length of ${duration}.\n`);
+        return true;
+      } else {
+        console.log(`Duration mismatch for ${fn}, retrying: ${fileDuration} vs ${duration}.\n`);
+        return false;
+      }
+    } catch (error) {
+      console.error(`Error getting duration of the downloaded file ${fn}: ${error}.\n`);
+      return false;
+    }
+  } else {
+    console.error(`Downloaded file not found at ${outputPath + fn}.\n`);
+    return false;
+  }
+}
+
+export const downloadChildProcess = async (id, name, duration, outputPath, fn, maxRetries) => {
+  return new Promise(async (resolve, reject) => {
+    let retries = 0;
+    while (retries <= maxRetries) {
+      try {
+        if (retries > 0) console.log(`Attempting ${retries} / ${maxRetries} for ${name} (${id})...\n`);
+        const child = spawn('node', ['downloader.js', id, name, outputPath]);
+
+        child.stdout.on('data', (data) => {
+          console.log(`${data}`);
+        });
+
+        await new Promise((childResolve, childReject) => {
+          child.on('close', async (code) => {
+            if (code === 0) {
+              console.log(`Process for ${name} (${id}) exited with success.\n`);
+              if (verifyFile(outputPath, fn, duration)) {
+                childResolve();
+              } else {
+                childReject(new Error(`Downloaded file ${fn} of length ${fileDuration} does not match expected length of ${duration}.\n`));
+              }
+            } else {
+              childReject(new Error(`Process exited with error code ${code}.\n`));
+            }
+          });
+        });
+
+        resolve();
+        break;
+      } catch (error) {
+        if (await verifyFile(outputPath, fn, duration)) {
+          resolve();
+          break;
+        }
+        console.error(`Error on attempt ${retries + 1} for ${name} (${id}): ${error.message}`);
+        retries++;
+      }
+    }
+
+    if (retries >= maxRetries) {
+      reject(new Error(`All retries failed for ${name} (${id}).\n`));
+    }
+  });
+}
+
+const durationToSeconds = (duration) => {
   const match = duration.match(/P(\d+Y)?(\d+M)?(\d+W)?(\d+D)?T(\d+H)?(\d+M)?(\d+S)?/);
   const parts = [
     { pos: 1, multiplier: 86400 * 365 },
