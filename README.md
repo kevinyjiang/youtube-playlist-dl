@@ -37,7 +37,9 @@ export YOUTUBE_API_KEY=your_api_key
 mkdir -p data/dataset_name
 ```
 
-2. Inside the subdirectory, create a text file called `playlist_urls.txt` for playlists or `video_urls.txt` for individual videos. Each line should contain a URL to a YouTube playlist or video, respectively.
+2. Inside the subdirectory, create a text file called `playlist_urls.txt` for playlists or `video_urls.txt` for individual videos. Each line should contain a URL to a YouTube playlist or video, respectively. 
+
+    __Warning:__ Be careful downloading massive playlists or long lists of videos--I haven't implemented a concurrency limit.
 
 3. Run the program. Without any flags, it will run on the `default` dataset in playlist mode.
 
